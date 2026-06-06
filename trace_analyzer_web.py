@@ -37,13 +37,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- State Initialization (Strictly Isolated to Each User's Browser Tab) ---
+# --- State Initialization ---
 if "search_strings" not in st.session_state:
     st.session_state.search_strings = []
 if "processed_lines" not in st.session_state:
     st.session_state.processed_lines = []
 if "display_lines" not in st.session_state:
     st.session_state.display_lines = []
+if "all_raw_lines" not in st.session_state:
+    st.session_state.all_raw_lines = []  # 🧠 CRITICAL: Keeps the raw lines cached safely in memory
 if "temp_file_path" not in st.session_state:
     st.session_state.temp_file_path = None
 if "is_compressed" not in st.session_state:
@@ -68,7 +70,6 @@ def clear_keywords():
     st.session_state.selected_line = None
 
 def clear_full_session():
-    """Manually clear the file from the server disk securely."""
     if st.session_state.temp_file_path and os.path.exists(st.session_state.temp_file_path):
         try:
             os.remove(st.session_state.temp_file_path)
@@ -77,6 +78,7 @@ def clear_full_session():
     st.session_state.search_strings = []
     st.session_state.processed_lines = []
     st.session_state.display_lines = []
+    st.session_state.all_raw_lines = []
     st.session_state.selected_line = None
     st.session_state.temp_file_path = None
     st.toast("🧹 Server disk space reset successfully!", icon="🗑️")
@@ -127,7 +129,6 @@ if uploaded_file is not None and analyze_clicked:
         is_gz = uploaded_file.name.endswith(".gz")
         suffix = ".gz" if is_gz else ".txt"
         
-        # Unique session file path configuration prevents separate user uploads from overwriting each other
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             first_chunk = True
             while chunk := uploaded_file.read(50 * 1024 * 1024):
@@ -140,11 +141,12 @@ if uploaded_file is not None and analyze_clicked:
             st.session_state.temp_file_path = temp_file.name
             st.session_state.is_compressed = is_gz
 
-        status_container.info("⚡ Parsing spooled file line-by-line...")
+        status_container.info("⚡ Loading log array into cache container...")
         
         queries = st.session_state.search_strings
         matches = []
         display_matches = []
+        raw_lines_cache = []
         
         open_func = gzip.open if st.session_state.is_compressed else open
         mode = 'rt' if st.session_state.is_compressed else 'r'
@@ -152,12 +154,15 @@ if uploaded_file is not None and analyze_clicked:
         with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
             file_iter = iter(file)
             for line in file_iter:
-                if any(obj in line for obj in BLACKLIST): 
+                clean_line = line.strip()
+                raw_lines_cache.append(clean_line)  # Cache the line so it survives the tab refresh
+                
+                if any(obj in clean_line for obj in BLACKLIST): 
                     continue
                 
-                has_dal = any(t in line for t in TARGETS)
-                has_depth = "-->>" in line and "(depth" in line
-                matched_q = next((q for q in queries if q in line), None)
+                has_dal = any(t in clean_line for t in TARGETS)
+                has_depth = "-->>" in clean_line and "(depth" in clean_line
+                matched_q = next((q for q in queries if q in clean_line), None)
                 
                 show = False
                 if queries:
@@ -173,12 +178,12 @@ if uploaded_file is not None and analyze_clicked:
                     elif inc_depth: show = has_depth
 
                 if show:
-                    clean_line = line.strip()
                     matches.append(clean_line) 
                     
                     if "form.text$" in clean_line:
                         try:
                             next_line = next(file_iter).strip()
+                            raw_lines_cache.append(next_line)
                             if "3gl call returned:" in next_line:
                                 display_matches.append(next_line)
                             else:
@@ -194,8 +199,9 @@ if uploaded_file is not None and analyze_clicked:
                         
         st.session_state.processed_lines = matches
         st.session_state.display_lines = display_matches
+        st.session_state.all_raw_lines = raw_lines_cache
         st.session_state.selected_line = None  
-        status_container.success(f"✅ Finished! Found {len(matches)} rows.")
+        status_container.success(f"✅ Finished! Loaded {len(matches)} rows successfully.")
         
     except Exception as e:
         status_container.error(f"Server Processing Error: {e}")
@@ -204,7 +210,6 @@ if uploaded_file is not None and analyze_clicked:
 tab_titles = ["📋 Main Search Results", "🥞 Reconstructed Stack Trace"]
 tab_main, tab_stack = st.tabs(tab_titles)
 
-# --- Tab 1: Main Search Output Viewport ---
 with tab_main:
     st.title("Infor LN Cloud-Ready Trace Engine")
     st.caption("Direct Interactive Row Click Framework")
@@ -235,9 +240,8 @@ with tab_main:
     else:
         st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
 
-# --- Tab 2: Reconstructed Stack Trace Viewport ---
 with tab_stack:
-    if st.session_state.selected_line and st.session_state.temp_file_path:
+    if st.session_state.selected_line and st.session_state.all_raw_lines:
         selected_line = st.session_state.selected_line
         
         if "(depth" in selected_line:
@@ -260,47 +264,39 @@ with tab_stack:
                 target_depth = 0
 
             if target_depth > 0:
-                open_func = gzip.open if st.session_state.is_compressed else open
-                mode = 'rt' if st.session_state.is_compressed else 'r'
+                # 🛠️ FIXED: Reads directly out of the memory session state log cache so it never fails or goes empty!
+                for clean_line in st.session_state.all_raw_lines:
+                    if session_id and session_id not in clean_line:
+                        continue
+                        
+                    if "-->>" in clean_line and "(depth" in clean_line and "(in object" in clean_line:
+                        if not any(obj in clean_line for obj in BLACKLIST):
+                            try:
+                                curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
+                                stack_map[curr_depth] = clean_line
+                            except ValueError:
+                                pass
+                    if selected_line in clean_line:
+                        found = True
+                        break
                 
-                try:
-                    with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
-                        for line in file:
-                            clean_line = line.strip()
-                            
-                            if session_id and session_id not in clean_line:
-                                continue
-                                
-                            if "-->>" in clean_line and "(depth" in clean_line and "(in object" in clean_line:
-                                if not any(obj in clean_line for obj in BLACKLIST):
-                                    try:
-                                        curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
-                                        stack_map[curr_depth] = clean_line
-                                    except ValueError:
-                                        pass
-                            if selected_line in clean_line:
-                                found = True
-                                break
+                if found:
+                    valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
+                    stack_output = []
                     
-                    if found:
-                        valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
-                        stack_output = []
+                    for d in valid_depths:
+                        line_text = stack_map[d]
                         
-                        for d in valid_depths:
-                            line_text = stack_map[d]
-                            
-                            if use_ts and "-->>" in line_text:
-                                line_text = line_text[line_text.find("-->>"):]
-                            
-                            line_text = line_text.strip()
-                            line_text = re.sub(r'-->>\s*', '-->> ', line_text)
-                            stack_output.append(line_text)
+                        if use_ts and "-->>" in line_text:
+                            line_text = line_text[line_text.find("-->>"):]
                         
-                        st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
-                    else:
-                        st.error("Target step location dropped outside scope boundary indices.")
-                except Exception as e:
-                    st.error(f"Snapshot building error: {e}")
+                        line_text = line_text.strip()
+                        line_text = re.sub(r'-->>\s*', '-->> ', line_text)
+                        stack_output.append(line_text)
+                    
+                    st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
+                else:
+                    st.error("Target step location dropped outside scope boundary indices.")
         else:
             st.warning("⚠️ Selected entry line item lacks structured calling depth markers `(depth X)`.")
     else:
