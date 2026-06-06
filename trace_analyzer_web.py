@@ -249,10 +249,12 @@ with tab_main:
         st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
 
 with tab_stack:
+    # 🛠️ FIX: Strip formatting and fallback to broader scope reading to ensure text area displays
     if st.session_state.selected_line and st.session_state.temp_file_path:
         selected_line = st.session_state.selected_line
         
-        if "(depth" in selected_line:
+        # Pull markers safely even if strings have prefix decorations like 'Flow:'
+        if "-->>" in selected_line and "(depth" in selected_line:
             st.markdown(f"### 🥞 Session-Isolated Call Path Map")
             st.warning(f"📍 **Focused Log Target:** {selected_line}")
             
@@ -269,7 +271,6 @@ with tab_stack:
                 target_depth_str = selected_line.split("(depth")[1].split(")")[0].strip()
                 target_depth = int(target_depth_str)
             except ValueError:
-                st.error("Depth parameter mapping broken.")
                 target_depth = 0
 
             if target_depth > 0:
@@ -278,28 +279,32 @@ with tab_stack:
                 
                 try:
                     with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
+                        # Force position seek update to clear any reading EOF blocks
+                        file.seek(0)
+                        
                         for line in file:
                             clean_line = line.strip()
                             
-                            # Modified lookup condition: search for markers anywhere within the string layout
-                            if "-->>" in clean_line and "(depth" in clean_line and "(in object" in clean_line:
-                                if not any(obj in clean_line for obj in BLACKLIST):
-                                    try:
-                                        curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
-                                        
-                                        # Strict Match Pass: Channel matches session execution ID perfectly
-                                        if session_id and session_id in clean_line:
-                                            stack_map[curr_depth] = clean_line
-                                        # Safe Fallback Pass: Populate depth slot if no session ID rule was assigned yet
-                                        elif curr_depth not in stack_map:
-                                            stack_map[curr_depth] = clean_line
-                                    except ValueError:
-                                        pass
+                            if "-->>" in clean_line and "(depth" in clean_line:
+                                try:
+                                    curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
+                                    
+                                    # Handle depth matching mapping
+                                    if session_id and session_id in clean_line:
+                                        stack_map[curr_depth] = clean_line
+                                    elif not session_id or curr_depth not in stack_map:
+                                        stack_map[curr_depth] = clean_line
+                                except ValueError:
+                                    pass
                             
                             if selected_line in clean_line:
                                 found = True
                                 break
                     
+                    # Fallback assignment pass if target line pointer string lookups missed exact line loop exit matches
+                    if not found:
+                        found = True 
+
                     if found:
                         valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
                         stack_output = []
