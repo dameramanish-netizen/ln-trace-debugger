@@ -239,7 +239,6 @@ with tab_main:
         
         if selection_event and selection_event.selection and selection_event.selection.rows:
             selected_row_idx = selection_event.selection.rows[0]
-            # Capture the completely raw un-mutated log row structure mapping index
             chosen_line = st.session_state.processed_lines[selected_row_idx]
             
             if st.session_state.selected_line != chosen_line:
@@ -253,66 +252,52 @@ with tab_stack:
     if st.session_state.selected_line and st.session_state.temp_file_path:
         selected_line = st.session_state.selected_line
         
-        # 🛠️ Robust Regex Extraction for Target Line Depth Parameter Configuration
-        depth_match = re.search(r'\(depth\s+(\d+)\)', selected_line)
-        target_depth = int(depth_match.group(1)) if depth_match else 0
-        
-        if target_depth > 0:
+        if "(depth" in selected_line:
             st.markdown(f"### 🥞 Session-Isolated Call Path Map")
             st.warning(f"📍 **Focused Log Target:** {selected_line}")
             
-            session_match = re.search(r':::\(\d+\):', selected_line)
-            session_id = session_match.group(0) if session_match else None
-            
-            if session_id:
-                st.info(f"🔒 **Isolating Trace Path to Process Channel:** `{session_id}`")
-
-            stack_map = {}
-            open_func = gzip.open if st.session_state.is_compressed else open
-            mode = 'rt' if st.session_state.is_compressed else 'r'
-            
+            # Extract depth number cleanly
             try:
-                with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
-                    for line in file:
-                        clean_line = line.strip()
-                        
-                        # Flexible Regex Match checks for trace line entries anywhere in the sequence
-                        line_depth_match = re.search(r'-->>\s*\(depth\s+(\d+)\)', clean_line)
-                        if line_depth_match:
-                            try:
-                                curr_depth = int(line_depth_match.group(1))
-                                
-                                if session_id and session_id in clean_line:
-                                    stack_map[curr_depth] = clean_line
-                                elif not session_id or curr_depth not in stack_map:
-                                    stack_map[curr_depth] = clean_line
-                            except ValueError:
-                                pass
-                        
-                        # Stop iterating the moment we read up to our target line step index location
-                        if selected_line in clean_line:
-                            break
-                
-                # Sort and assemble the outputs from depth 1 up to the chosen deep execution branch
-                valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
+                target_depth_str = selected_line.split("(depth")[1].split(")")[0].strip()
+                target_depth = int(target_depth_str)
+            except Exception:
+                target_depth = 0
+
+            if target_depth > 0:
                 stack_output = []
+                open_func = gzip.open if st.session_state.is_compressed else open
+                mode = 'rt' if st.session_state.is_compressed else 'r'
                 
-                for d in valid_depths:
-                    line_text = stack_map[d]
-                    if use_ts and "-->>" in line_text:
-                        line_text = line_text[line_text.find("-->>"):]
+                try:
+                    # Pure, clean top-to-bottom scan loop
+                    with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
+                        for line in file:
+                            clean_line = line.strip()
+                            
+                            # Standard parent trace matching layout
+                            if "-->>" in clean_line and "(depth" in clean_line:
+                                try:
+                                    curr_depth_str = clean_line.split("(depth")[1].split(")")[0].strip()
+                                    curr_depth = int(curr_depth_str)
+                                    
+                                    if curr_depth <= target_depth:
+                                        # Process cleaning
+                                        if use_ts and "-->>" in clean_line:
+                                            clean_line = clean_line[clean_line.find("-->>"):]
+                                        stack_output.append(clean_line)
+                                except Exception:
+                                    pass
+                            
+                            # Break loop once file matching reaches chosen row string
+                            if selected_line in clean_line:
+                                break
                     
-                    line_text = line_text.strip()
-                    line_text = re.sub(r'-->>\s*', '-->> ', line_text)
-                    stack_output.append(line_text)
-                
-                if stack_output:
-                    st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
-                else:
-                    st.info("No matching trace tree elements discovered leading up to this point.")
-                    
-            except Exception as e:
-                st.error(f"Snapshot building error: {e}")
+                    if stack_output:
+                        st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
+                    else:
+                        st.info("No matching trace tree elements discovered leading up to this point.")
+                except Exception as e:
+                    st.error(f"Snapshot building error: {e}")
         else:
             st.warning("⚠️ Selected entry line item lacks structured calling depth markers `(depth X)`.")
     else:
