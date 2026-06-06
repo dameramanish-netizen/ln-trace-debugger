@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom Monospace Viewport Styling & Bottom Horizontal Slider
+# Custom Monospace Viewport Styling & Bottom Horizontal Slider Addition
 st.markdown("""
     <style>
     /* Force monospace layout for the log tables */
@@ -61,14 +61,8 @@ def add_keyword():
         st.session_state.search_strings.append(kw)
     st.session_state.keyword_input = ""
 
-def clear_keywords():
-    st.session_state.search_strings = []
-    st.session_state.processed_lines = []
-    st.session_state.display_lines = []
-    st.session_state.selected_line = None
-
-def clear_full_session():
-    """Manually clear the file from the server disk securely."""
+def clear_keywords_and_file():
+    """Manual trigger to wipe data completely when a user is finished."""
     if st.session_state.temp_file_path and os.path.exists(st.session_state.temp_file_path):
         try:
             os.remove(st.session_state.temp_file_path)
@@ -79,7 +73,7 @@ def clear_full_session():
     st.session_state.display_lines = []
     st.session_state.selected_line = None
     st.session_state.temp_file_path = None
-    st.toast("🧹 Server disk space reset successfully!", icon="🗑️")
+    st.toast("🧹 Server session data cleared successfully!", icon="🗑️")
 
 # --- UI Sidebar Layout ---
 with st.sidebar:
@@ -101,7 +95,7 @@ with st.sidebar:
     with col_btn1:
         st.button("Add String", on_click=add_keyword, width="stretch")
     with col_btn2:
-        st.button("Clear Keywords", on_click=clear_keywords, width="stretch")
+        st.button("Clear Session & Data", on_click=clear_keywords_and_file, width="stretch", type="secondary")
         
     if st.session_state.search_strings:
         st.write("**Active Rules:**")
@@ -112,8 +106,6 @@ with st.sidebar:
     inc_dal = st.checkbox("DAL Filter", value=True)
     inc_depth = st.checkbox("Depth Filter", value=False)
     use_ts = st.checkbox("Has Timestamps (Truncate in Stack)", value=True)
-
-    st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, width="stretch")
 
     st.markdown("---")
     analyze_clicked = st.button("⚡ Run Web Stream Processor", type="primary", width="stretch")
@@ -150,6 +142,7 @@ if uploaded_file is not None and analyze_clicked:
         
         with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
             file_iter = iter(file)
+            
             for line in file_iter:
                 if any(obj in line for obj in BLACKLIST): 
                     continue
@@ -256,6 +249,7 @@ with tab_stack:
                 target_depth_str = selected_line.split("(depth")[1].split(")")[0].strip()
                 target_depth = int(target_depth_str)
             except ValueError:
+                st.error("Depth parameter mapping broken.")
                 target_depth = 0
 
             if target_depth > 0:
