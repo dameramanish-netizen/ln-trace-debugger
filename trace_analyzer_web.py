@@ -228,7 +228,7 @@ tab_main, tab_stack = st.tabs(tab_titles)
 
 # --- Tab 1: Main Search Output Viewport ---
 with tab_main:
-    st.title("Infor LN Cloud-Ready Trace Engine")
+    st.title("Infor LN Trace Engine")
     st.caption("Direct Interactive Row Click Framework")
     st.markdown("---")
 
