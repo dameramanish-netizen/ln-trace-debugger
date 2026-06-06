@@ -256,7 +256,13 @@ with tab_stack:
             st.markdown(f"### 🥞 Session-Isolated Call Path Map")
             st.warning(f"📍 **Focused Log Target:** {selected_line}")
             
-            # Extract depth number cleanly
+            # Extract process execution context channel (e.g., ":::(00044):")
+            session_match = re.search(r':::\(\d+\):', selected_line)
+            session_id = session_match.group(0) if session_match else None
+            
+            if session_id:
+                st.info(f"🔒 **Isolating Trace Path to Process Channel:** `{session_id}`")
+
             try:
                 target_depth_str = selected_line.split("(depth")[1].split(")")[0].strip()
                 target_depth = int(target_depth_str)
@@ -264,34 +270,44 @@ with tab_stack:
                 target_depth = 0
 
             if target_depth > 0:
-                stack_output = []
+                # 🛠️ FIX: Use a map to track the correct tree path by depth and eliminate duplicate/interleaved noise
+                stack_map = {}
                 open_func = gzip.open if st.session_state.is_compressed else open
                 mode = 'rt' if st.session_state.is_compressed else 'r'
                 
                 try:
-                    # Pure, clean top-to-bottom scan loop
                     with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
                         for line in file:
                             clean_line = line.strip()
                             
-                            # Standard parent trace matching layout
                             if "-->>" in clean_line and "(depth" in clean_line:
                                 try:
                                     curr_depth_str = clean_line.split("(depth")[1].split(")")[0].strip()
                                     curr_depth = int(curr_depth_str)
                                     
-                                    if curr_depth <= target_depth:
-                                        # Process cleaning
-                                        if use_ts and "-->>" in clean_line:
-                                            clean_line = clean_line[clean_line.find("-->>"):]
-                                        stack_output.append(clean_line)
+                                    # Ensure strict process sequence tracking
+                                    if session_id and session_id in clean_line:
+                                        stack_map[curr_depth] = clean_line
+                                    elif not session_id or curr_depth not in stack_map:
+                                        stack_map[curr_depth] = clean_line
                                 except Exception:
                                     pass
                             
-                            # Break loop once file matching reaches chosen row string
                             if selected_line in clean_line:
                                 break
                     
+                    # Construct clean hierarchy from depth 1 straight up to target depth level
+                    valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
+                    stack_output = []
+                    
+                    for d in valid_depths:
+                        line_text = stack_map[d]
+                        if use_ts and "-->>" in line_text:
+                            line_text = line_text[line_text.find("-->>"):]
+                        line_text = line_text.strip()
+                        line_text = re.sub(r'-->>\s*', '-->> ', line_text)
+                        stack_output.append(line_text)
+                        
                     if stack_output:
                         st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
                     else:
