@@ -252,4 +252,9 @@ with tab_main:
             
             if st.session_state.selected_line != chosen_line:
                 st.session_state.selected_line = chosen_line
-                st.markdown('<script>window.parent.document.querySelectorAll("[data-baseweb=\'tab\']")[1].click();</script>', unsafe_allow_html=True
+                # 🛠️ FIX: Closed the parenthesis correctly at the end of st.markdown
+                st.markdown('<script>window.parent.document.querySelectorAll("[data-baseweb=\'tab\']")[1].click();</script>', unsafe_allow_html=True)
+                st.rerun()
+    else:
+        st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
+        
