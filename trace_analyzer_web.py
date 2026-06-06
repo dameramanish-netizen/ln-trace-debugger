@@ -249,11 +249,9 @@ with tab_main:
         st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
 
 with tab_stack:
-    # 🛠️ FIX: Strip formatting and fallback to broader scope reading to ensure text area displays
     if st.session_state.selected_line and st.session_state.temp_file_path:
         selected_line = st.session_state.selected_line
         
-        # Pull markers safely even if strings have prefix decorations like 'Flow:'
         if "-->>" in selected_line and "(depth" in selected_line:
             st.markdown(f"### 🥞 Session-Isolated Call Path Map")
             st.warning(f"📍 **Focused Log Target:** {selected_line}")
@@ -278,10 +276,8 @@ with tab_stack:
                 mode = 'rt' if st.session_state.is_compressed else 'r'
                 
                 try:
+                    # Freshly opens the file handle so reading starts clean from line 1
                     with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
-                        # Force position seek update to clear any reading EOF blocks
-                        file.seek(0)
-                        
                         for line in file:
                             clean_line = line.strip()
                             
@@ -289,7 +285,6 @@ with tab_stack:
                                 try:
                                     curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
                                     
-                                    # Handle depth matching mapping
                                     if session_id and session_id in clean_line:
                                         stack_map[curr_depth] = clean_line
                                     elif not session_id or curr_depth not in stack_map:
@@ -301,7 +296,6 @@ with tab_stack:
                                 found = True
                                 break
                     
-                    # Fallback assignment pass if target line pointer string lookups missed exact line loop exit matches
                     if not found:
                         found = True 
 
