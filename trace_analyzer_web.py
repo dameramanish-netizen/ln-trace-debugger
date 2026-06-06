@@ -42,7 +42,7 @@ st.markdown("""
 # --- 🕒 30-Minute Delayed Background Cleanup Engine ---
 def delayed_cleanup(file_path):
     """Waits for 30 minutes in a separate thread, then safely drops the file if it exists."""
-    time.sleep(1800) # 30 minutes = 1800 seconds
+    time.sleep(1800) 
     try:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
@@ -139,7 +139,6 @@ if uploaded_file is not None and analyze_clicked:
         is_gz = uploaded_file.name.endswith(".gz")
         suffix = ".gz" if is_gz else ".txt"
         
-        # Open and write out the file cleanly
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             first_chunk = True
             while chunk := uploaded_file.read(50 * 1024 * 1024):
@@ -152,7 +151,6 @@ if uploaded_file is not None and analyze_clicked:
             st.session_state.temp_file_path = temp_file.name
             st.session_state.is_compressed = is_gz
 
-            # Start 30-minute countdown tracking thread
             cleanup_thread = threading.Thread(target=delayed_cleanup, args=(temp_file.name,), daemon=True)
             cleanup_thread.start()
 
@@ -279,19 +277,22 @@ with tab_stack:
                 mode = 'rt' if st.session_state.is_compressed else 'r'
                 
                 try:
-                    # 🛠️ CRITICAL FIX: Explicitly reopen the file handle fresh so pointer starts at line 0
                     with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
                         for line in file:
                             clean_line = line.strip()
                             
-                            if session_id and session_id not in clean_line:
-                                continue
-                                
+                            # Modified lookup condition: search for markers anywhere within the string layout
                             if "-->>" in clean_line and "(depth" in clean_line and "(in object" in clean_line:
                                 if not any(obj in clean_line for obj in BLACKLIST):
                                     try:
                                         curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
-                                        stack_map[curr_depth] = clean_line
+                                        
+                                        # Strict Match Pass: Channel matches session execution ID perfectly
+                                        if session_id and session_id in clean_line:
+                                            stack_map[curr_depth] = clean_line
+                                        # Safe Fallback Pass: Populate depth slot if no session ID rule was assigned yet
+                                        elif curr_depth not in stack_map:
+                                            stack_map[curr_depth] = clean_line
                                     except ValueError:
                                         pass
                             
@@ -312,7 +313,10 @@ with tab_stack:
                             line_text = re.sub(r'-->>\s*', '-->> ', line_text)
                             stack_output.append(line_text)
                         
-                        st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
+                        if stack_output:
+                            st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
+                        else:
+                            st.info("No matching trace tree elements discovered leading up to this point.")
                     else:
                         st.error("Target step location dropped outside scope boundary indices.")
                 except Exception as e:
