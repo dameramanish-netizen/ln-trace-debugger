@@ -4,8 +4,6 @@ import os
 import tempfile
 import pandas as pd
 import re
-import time
-import threading
 
 # --- Page Configuration & Theme Styling ---
 st.set_page_config(
@@ -14,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom Monospace Viewport Styling & Bottom Horizontal Slider Addition
+# Custom Monospace Viewport Styling & Bottom Horizontal Slider
 st.markdown("""
     <style>
     /* Force monospace layout for the log tables */
@@ -38,17 +36,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# --- 🕒 30-Minute Delayed Background Cleanup Engine ---
-def delayed_cleanup(file_path):
-    """Waits for 30 minutes in a separate thread, then safely drops the file if it exists."""
-    time.sleep(1800) 
-    try:
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"🧹 Delayed Cleanup Success: Automatically purged expired trace file {file_path}")
-    except Exception as e:
-        print(f"⚠️ Delayed cleanup background worker alert: {e}")
 
 # --- State Initialization ---
 if "search_strings" not in st.session_state:
@@ -81,6 +68,7 @@ def clear_keywords():
     st.session_state.selected_line = None
 
 def clear_full_session():
+    """Manually clear the file from the server disk securely."""
     if st.session_state.temp_file_path and os.path.exists(st.session_state.temp_file_path):
         try:
             os.remove(st.session_state.temp_file_path)
@@ -91,7 +79,7 @@ def clear_full_session():
     st.session_state.display_lines = []
     st.session_state.selected_line = None
     st.session_state.temp_file_path = None
-    st.toast("🗑️ Server disk space and session reset completely!", icon="🧹")
+    st.toast("🧹 Server disk space reset successfully!", icon="🗑️")
 
 # --- UI Sidebar Layout ---
 with st.sidebar:
@@ -150,9 +138,6 @@ if uploaded_file is not None and analyze_clicked:
             
             st.session_state.temp_file_path = temp_file.name
             st.session_state.is_compressed = is_gz
-
-            cleanup_thread = threading.Thread(target=delayed_cleanup, args=(temp_file.name,), daemon=True)
-            cleanup_thread.start()
 
         status_container.info("⚡ Parsing spooled file line-by-line...")
         
@@ -218,6 +203,7 @@ if uploaded_file is not None and analyze_clicked:
 tab_titles = ["📋 Main Search Results", "🥞 Reconstructed Stack Trace"]
 tab_main, tab_stack = st.tabs(tab_titles)
 
+# --- Tab 1: Main Search Output Viewport ---
 with tab_main:
     st.title("Infor LN Cloud-Ready Trace Engine")
     st.caption("Direct Interactive Row Click Framework")
@@ -248,6 +234,7 @@ with tab_main:
     else:
         st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
 
+# --- Tab 2: Reconstructed Stack Trace Viewport ---
 with tab_stack:
     if st.session_state.selected_line and st.session_state.temp_file_path:
         selected_line = st.session_state.selected_line
@@ -256,22 +243,22 @@ with tab_stack:
             st.markdown(f"### 🥞 Session-Isolated Call Path Map")
             st.warning(f"📍 **Focused Log Target:** {selected_line}")
             
-            # Extract process execution context channel (e.g., ":::(00044):")
             session_match = re.search(r':::\(\d+\):', selected_line)
             session_id = session_match.group(0) if session_match else None
             
             if session_id:
                 st.info(f"🔒 **Isolating Trace Path to Process Channel:** `{session_id}`")
 
+            stack_map = {}
+            found = False
+            
             try:
                 target_depth_str = selected_line.split("(depth")[1].split(")")[0].strip()
                 target_depth = int(target_depth_str)
-            except Exception:
+            except ValueError:
                 target_depth = 0
 
             if target_depth > 0:
-                # 🛠️ FIX: Use a map to track the correct tree path by depth and eliminate duplicate/interleaved noise
-                stack_map = {}
                 open_func = gzip.open if st.session_state.is_compressed else open
                 mode = 'rt' if st.session_state.is_compressed else 'r'
                 
@@ -280,38 +267,37 @@ with tab_stack:
                         for line in file:
                             clean_line = line.strip()
                             
-                            if "-->>" in clean_line and "(depth" in clean_line:
-                                try:
-                                    curr_depth_str = clean_line.split("(depth")[1].split(")")[0].strip()
-                                    curr_depth = int(curr_depth_str)
-                                    
-                                    # Ensure strict process sequence tracking
-                                    if session_id and session_id in clean_line:
+                            if session_id and session_id not in clean_line:
+                                continue
+                                
+                            if "-->>" in clean_line and "(depth" in clean_line and "(in object" in clean_line:
+                                if not any(obj in clean_line for obj in BLACKLIST):
+                                    try:
+                                        curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
                                         stack_map[curr_depth] = clean_line
-                                    elif not session_id or curr_depth not in stack_map:
-                                        stack_map[curr_depth] = clean_line
-                                except Exception:
-                                    pass
-                            
+                                    except ValueError:
+                                        pass
                             if selected_line in clean_line:
+                                found = True
                                 break
                     
-                    # Construct clean hierarchy from depth 1 straight up to target depth level
-                    valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
-                    stack_output = []
-                    
-                    for d in valid_depths:
-                        line_text = stack_map[d]
-                        if use_ts and "-->>" in line_text:
-                            line_text = line_text[line_text.find("-->>"):]
-                        line_text = line_text.strip()
-                        line_text = re.sub(r'-->>\s*', '-->> ', line_text)
-                        stack_output.append(line_text)
+                    if found:
+                        valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
+                        stack_output = []
                         
-                    if stack_output:
+                        for d in valid_depths:
+                            line_text = stack_map[d]
+                            
+                            if use_ts and "-->>" in line_text:
+                                line_text = line_text[line_text.find("-->>"):]
+                            
+                            line_text = line_text.strip()
+                            line_text = re.sub(r'-->>\s*', '-->> ', line_text)
+                            stack_output.append(line_text)
+                        
                         st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
                     else:
-                        st.info("No matching trace tree elements discovered leading up to this point.")
+                        st.error("Target step location dropped outside scope boundary indices.")
                 except Exception as e:
                     st.error(f"Snapshot building error: {e}")
         else:
