@@ -37,7 +37,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- State Initialization ---
+# --- State Initialization (Strictly Isolated to Each User's Browser Tab) ---
 if "search_strings" not in st.session_state:
     st.session_state.search_strings = []
 if "processed_lines" not in st.session_state:
@@ -127,6 +127,7 @@ if uploaded_file is not None and analyze_clicked:
         is_gz = uploaded_file.name.endswith(".gz")
         suffix = ".gz" if is_gz else ".txt"
         
+        # Unique session file path configuration prevents separate user uploads from overwriting each other
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             first_chunk = True
             while chunk := uploaded_file.read(50 * 1024 * 1024):
