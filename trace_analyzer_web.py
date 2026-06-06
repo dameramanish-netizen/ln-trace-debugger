@@ -191,7 +191,7 @@ tab_titles = ["📋 Main Search Results", "🥞 Reconstructed Stack Trace"]
 tab_main, tab_stack = st.tabs(tab_titles)
 
 with tab_main:
-    st.title("Infor LN Cloud-Ready Trace Engine")
+    st.title("Infor LN Trace Engine")
     st.markdown("---")
 
     if st.session_state.display_lines:
