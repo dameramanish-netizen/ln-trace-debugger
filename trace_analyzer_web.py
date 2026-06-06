@@ -5,7 +5,7 @@ import tempfile
 import pandas as pd
 import re
 import time
-import threading  # 🚀 Added for the background countdown timer
+import threading
 
 # --- Page Configuration & Theme Styling ---
 st.set_page_config(
@@ -42,8 +42,7 @@ st.markdown("""
 # --- 🕒 30-Minute Delayed Background Cleanup Engine ---
 def delayed_cleanup(file_path):
     """Waits for 30 minutes in a separate thread, then safely drops the file if it exists."""
-    # 30 minutes = 1800 seconds
-    time.sleep(1800) 
+    time.sleep(1800) # 30 minutes = 1800 seconds
     try:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
@@ -76,14 +75,12 @@ def add_keyword():
     st.session_state.keyword_input = ""
 
 def clear_keywords():
-    """Wipes out only the search terms so you can run a new search on the SAME file."""
     st.session_state.search_strings = []
     st.session_state.processed_lines = []
     st.session_state.display_lines = []
     st.session_state.selected_line = None
 
 def clear_full_session():
-    """Wipes everything, deletes the massive file from the server, and resets completely."""
     if st.session_state.temp_file_path and os.path.exists(st.session_state.temp_file_path):
         try:
             os.remove(st.session_state.temp_file_path)
@@ -116,7 +113,6 @@ with st.sidebar:
     with col_btn1:
         st.button("Add String", on_click=add_keyword, width="stretch")
     with col_btn2:
-        # Keeps your original keyword-only clear button untouched!
         st.button("Clear Keywords", on_click=clear_keywords, width="stretch")
         
     if st.session_state.search_strings:
@@ -129,7 +125,6 @@ with st.sidebar:
     inc_depth = st.checkbox("Depth Filter", value=False)
     use_ts = st.checkbox("Has Timestamps (Truncate in Stack)", value=True)
 
-    # 🚀 Dedicated manual session and disk cleanup master button
     st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, width="stretch")
 
     st.markdown("---")
@@ -144,6 +139,7 @@ if uploaded_file is not None and analyze_clicked:
         is_gz = uploaded_file.name.endswith(".gz")
         suffix = ".gz" if is_gz else ".txt"
         
+        # Open and write out the file cleanly
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             first_chunk = True
             while chunk := uploaded_file.read(50 * 1024 * 1024):
@@ -156,8 +152,7 @@ if uploaded_file is not None and analyze_clicked:
             st.session_state.temp_file_path = temp_file.name
             st.session_state.is_compressed = is_gz
 
-            # 🎯 START THE COUNTDOWN CLOCK:
-            # Spawns an independent background thread that runs a 30-minute timer.
+            # Start 30-minute countdown tracking thread
             cleanup_thread = threading.Thread(target=delayed_cleanup, args=(temp_file.name,), daemon=True)
             cleanup_thread.start()
 
@@ -172,7 +167,6 @@ if uploaded_file is not None and analyze_clicked:
         
         with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
             file_iter = iter(file)
-            
             for line in file_iter:
                 if any(obj in line for obj in BLACKLIST): 
                     continue
@@ -226,9 +220,8 @@ if uploaded_file is not None and analyze_clicked:
 tab_titles = ["📋 Main Search Results", "🥞 Reconstructed Stack Trace"]
 tab_main, tab_stack = st.tabs(tab_titles)
 
-# --- Tab 1: Main Search Output Viewport ---
 with tab_main:
-    st.title("Infor LN Trace Engine")
+    st.title("Infor LN Cloud-Ready Trace Engine")
     st.caption("Direct Interactive Row Click Framework")
     st.markdown("---")
 
@@ -252,9 +245,79 @@ with tab_main:
             
             if st.session_state.selected_line != chosen_line:
                 st.session_state.selected_line = chosen_line
-                # 🛠️ FIX: Closed the parenthesis correctly at the end of st.markdown
                 st.markdown('<script>window.parent.document.querySelectorAll("[data-baseweb=\'tab\']")[1].click();</script>', unsafe_allow_html=True)
                 st.rerun()
     else:
         st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
+
+with tab_stack:
+    if st.session_state.selected_line and st.session_state.temp_file_path:
+        selected_line = st.session_state.selected_line
         
+        if "(depth" in selected_line:
+            st.markdown(f"### 🥞 Session-Isolated Call Path Map")
+            st.warning(f"📍 **Focused Log Target:** {selected_line}")
+            
+            session_match = re.search(r':::\(\d+\):', selected_line)
+            session_id = session_match.group(0) if session_match else None
+            
+            if session_id:
+                st.info(f"🔒 **Isolating Trace Path to Process Channel:** `{session_id}`")
+
+            stack_map = {}
+            found = False
+            
+            try:
+                target_depth_str = selected_line.split("(depth")[1].split(")")[0].strip()
+                target_depth = int(target_depth_str)
+            except ValueError:
+                st.error("Depth parameter mapping broken.")
+                target_depth = 0
+
+            if target_depth > 0:
+                open_func = gzip.open if st.session_state.is_compressed else open
+                mode = 'rt' if st.session_state.is_compressed else 'r'
+                
+                try:
+                    # 🛠️ CRITICAL FIX: Explicitly reopen the file handle fresh so pointer starts at line 0
+                    with open_func(st.session_state.temp_file_path, mode, encoding="utf-8", errors="ignore") as file:
+                        for line in file:
+                            clean_line = line.strip()
+                            
+                            if session_id and session_id not in clean_line:
+                                continue
+                                
+                            if "-->>" in clean_line and "(depth" in clean_line and "(in object" in clean_line:
+                                if not any(obj in clean_line for obj in BLACKLIST):
+                                    try:
+                                        curr_depth = int(clean_line.split("(depth")[1].split(")")[0].strip())
+                                        stack_map[curr_depth] = clean_line
+                                    except ValueError:
+                                        pass
+                            
+                            if selected_line in clean_line:
+                                found = True
+                                break
+                    
+                    if found:
+                        valid_depths = sorted([d for d in stack_map.keys() if d <= target_depth])
+                        stack_output = []
+                        
+                        for d in valid_depths:
+                            line_text = stack_map[d]
+                            if use_ts and "-->>" in line_text:
+                                line_text = line_text[line_text.find("-->>"):]
+                            
+                            line_text = line_text.strip()
+                            line_text = re.sub(r'-->>\s*', '-->> ', line_text)
+                            stack_output.append(line_text)
+                        
+                        st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
+                    else:
+                        st.error("Target step location dropped outside scope boundary indices.")
+                except Exception as e:
+                    st.error(f"Snapshot building error: {e}")
+        else:
+            st.warning("⚠️ Selected entry line item lacks structured calling depth markers `(depth X)`.")
+    else:
+        st.info("Go to 'Main Search Results' and click directly on a trace line item log row to view its tree hierarchy.")
