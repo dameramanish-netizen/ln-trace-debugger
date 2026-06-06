@@ -62,10 +62,25 @@ def add_keyword():
     st.session_state.keyword_input = ""
 
 def clear_keywords():
+    """Wipes out only the search terms so you can run a new search on the SAME file."""
     st.session_state.search_strings = []
     st.session_state.processed_lines = []
     st.session_state.display_lines = []
     st.session_state.selected_line = None
+
+def clear_full_session():
+    """Wipes everything, deletes the massive file from the server, and resets completely."""
+    if st.session_state.temp_file_path and os.path.exists(st.session_state.temp_file_path):
+        try:
+            os.remove(st.session_state.temp_file_path)
+        except Exception:
+            pass
+    st.session_state.search_strings = []
+    st.session_state.processed_lines = []
+    st.session_state.display_lines = []
+    st.session_state.selected_line = None
+    st.session_state.temp_file_path = None
+    st.toast("🗑️ Server disk space and session reset completely!", icon="🧹")
 
 # --- UI Sidebar Layout ---
 with st.sidebar:
@@ -87,6 +102,7 @@ with st.sidebar:
     with col_btn1:
         st.button("Add String", on_click=add_keyword, width="stretch")
     with col_btn2:
+        # Keeps your original keyword-only clear button untouched!
         st.button("Clear Keywords", on_click=clear_keywords, width="stretch")
         
     if st.session_state.search_strings:
@@ -99,9 +115,12 @@ with st.sidebar:
     inc_depth = st.checkbox("Depth Filter", value=False)
     use_ts = st.checkbox("Has Timestamps (Truncate in Stack)", value=True)
 
+    # 🚀 New dedicated session and disk cleanup button placed perfectly here
+    st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, width="stretch")
+
     st.markdown("---")
     analyze_clicked = st.button("⚡ Run Web Stream Processor", type="primary", width="stretch")
-
+    
 # --- Memory-Safe Disk Spooling Engine ---
 if uploaded_file is not None and analyze_clicked:
     status_container = st.sidebar.empty()
