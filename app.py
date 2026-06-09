@@ -80,7 +80,7 @@ with st.sidebar:
     st.markdown("---")
     
     st.subheader("1. Data Source")
-    uploaded_file = st.file_uploader("Upload Heavy Trace File (.txt, .gz)", type=["txt", "gz", ""])
+    uploaded_file = st.file_uploader("Upload Heavy Trace File (.txt, .gz)", type=["txt", "gz"])
     
     st.markdown("---")
     st.subheader("2. Search Configuration")
