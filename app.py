@@ -88,7 +88,7 @@ with st.sidebar:
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        st.button("Add String", on_click=add_keyword, width="stretch")
+        st.button("Add String", on_click=add_keyword, use_container_width=True)
     with col_btn2:
         st.button("Clear Keywords", on_click=clear_keywords, width="stretch")
         
