@@ -102,9 +102,9 @@ with st.sidebar:
     inc_depth = st.checkbox("Depth Filter", value=False)
     use_ts = st.checkbox("Has Timestamps (Truncate in Stack)", value=True)
 
-    st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, width="stretch")
+    st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, use_container_width=True)
     st.markdown("---")
-    analyze_clicked = st.button("⚡ Run Web Stream Processor", type="primary", width="stretch")
+    analyze_clicked = st.button("⚡ Run Web Stream Processor", type="primary", use_container_width=True)
 
 # --- Memory-Safe Disk Spooling Engine ---
 if uploaded_file is not None and analyze_clicked:
