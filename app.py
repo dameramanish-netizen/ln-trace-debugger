@@ -196,7 +196,7 @@ with tab_main:
 
     if st.session_state.display_lines:
         df = pd.DataFrame({"Filtered Trace Output Logs": st.session_state.display_lines})
-        selection_event = st.dataframe(df, width="stretch", height=500, on_select="rerun", selection_mode="single-row")
+        selection_event = st.dataframe(df, use_container_width=True, height=500, on_select="rerun", selection_mode="single-row")
         
         if selection_event and selection_event.selection and selection_event.selection.rows:
             selected_row_idx = selection_event.selection.rows[0]
