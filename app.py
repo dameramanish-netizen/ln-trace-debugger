@@ -90,7 +90,7 @@ with st.sidebar:
     with col_btn1:
         st.button("Add String", on_click=add_keyword, use_container_width=True)
     with col_btn2:
-        st.button("Clear Keywords", on_click=clear_keywords, width="stretch")
+        st.button("Clear Keywords", on_click=clear_keywords, use_container_width=True)
         
     if st.session_state.search_strings:
         st.write("**Active Rules:**")
