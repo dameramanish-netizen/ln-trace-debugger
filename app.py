@@ -88,9 +88,9 @@ with st.sidebar:
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        st.button("Add String", on_click=add_keyword, use_container_width=True)
+        st.button("Add String", on_click=add_keyword, width="stretch")
     with col_btn2:
-        st.button("Clear Keywords", on_click=clear_keywords, use_container_width=True)
+        st.button("Clear Keywords", on_click=clear_keywords, width="stretch")
         
     if st.session_state.search_strings:
         st.write("**Active Rules:**")
@@ -102,9 +102,9 @@ with st.sidebar:
     inc_depth = st.checkbox("Depth Filter", value=False)
     use_ts = st.checkbox("Has Timestamps (Truncate in Stack)", value=True)
 
-    st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, use_container_width=True)
+    st.button("🔴 Clear Session Data (Delete File)", on_click=clear_full_session, width="stretch")
     st.markdown("---")
-    analyze_clicked = st.button("⚡ Run Web Stream Processor", type="primary", use_container_width=True)
+    analyze_clicked = st.button("⚡ Run Web Stream Processor", type="primary", width="stretch")
 
 # --- Memory-Safe Disk Spooling Engine ---
 if uploaded_file is not None and analyze_clicked:
@@ -196,7 +196,7 @@ with tab_main:
 
     if st.session_state.display_lines:
         df = pd.DataFrame({"Filtered Trace Output Logs": st.session_state.display_lines})
-        selection_event = st.dataframe(df, use_container_width=True, height=500, on_select="rerun", selection_mode="single-row")
+        selection_event = st.dataframe(df, width="stretch", height=500, on_select="rerun", selection_mode="single-row")
         
         if selection_event and selection_event.selection and selection_event.selection.rows:
             selected_row_idx = selection_event.selection.rows[0]
