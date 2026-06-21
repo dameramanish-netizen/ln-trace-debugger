@@ -1,13 +1,8 @@
 ---
-title: ln-trace-debugger
-emoji: 🛠️
+title: Ln Trace Debugger
+emoji: 🌐
 colorFrom: blue
 colorTo: indigo
-sdk: streamlit
-sdk_version: 1.58.0
-app_file: app.py
-pinned: false
+sdk: docker
+app_port: 7860
 ---
-
-# In-Trace Debugger
-Performance check and log trace analyzer application.
