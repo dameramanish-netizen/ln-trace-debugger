@@ -8,7 +8,7 @@ import re
 # --- Page Configuration & Theme Styling ---
 st.set_page_config(
     page_title="Infor LN Enterprise Trace Debugger",
-    page_icon="🌐",
+    page_icon="🔍",
     layout="wide"
 )
 
@@ -75,7 +75,7 @@ def clear_full_session():
 
 # --- UI Sidebar Layout ---
 with st.sidebar:
-    st.header("🌐 Public Server Engine")
+    st.header("Public Server Engine")
     st.caption("Processes heavy trace dumps safely using temporary local disk spooling.")
     st.markdown("---")
     
