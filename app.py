@@ -89,8 +89,38 @@ def apply_appearance():
         .hero h1 {font-size:1.5rem;}
         .st-key-results_panel,.st-key-stack_panel {padding:12px;}
     }
+    [data-testid="stMainBlockContainer"] {padding:2.8rem 1.5rem 1.5rem; max-width:none;}
+    [data-testid="stHeader"] {background:transparent; height:2.5rem;}
+    [data-testid="stSidebar"] {width:300px !important; min-width:300px !important;}
+    [data-testid="stSidebarUserContent"] {padding:0 1.1rem 1rem;}
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:.42rem;}
+    [data-testid="stSidebar"] h2 {padding:.2rem 0 .3rem;}
+    [data-testid="stSidebar"] h3 {padding:.3rem 0 .15rem; font-size:.95rem;}
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {padding:.4rem; min-height:0;}
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] {display:none;}
+    [data-testid="stSidebar"] button {min-height:2rem; padding:.25rem .55rem;}
+    [data-testid="stSidebar"] hr {margin:.4rem 0;}
+    [data-testid="stSidebar"] [data-testid="stCheckbox"] {min-height:1.7rem;}
+    [data-testid="stSidebar"] [data-testid="stCheckbox"] label:has(input:checked) span:first-child {background-color:#2563eb; border-color:#2563eb;}
+    .hero {padding:0 0 10px; background:transparent; border:0; margin:0;}
+    .hero h1 {color:TITLE_COLOR; font-size:2rem;}
+    .hero p {color:SUBTITLE_COLOR;}
+    .status-strip {margin-bottom:4px; padding:12px 16px; background:rgba(255,255,255,.78);}
+    [data-baseweb="tab-list"] {background:transparent; border-radius:0; padding:0; gap:28px;}
+    [data-baseweb="tab"] {color:TITLE_COLOR;}
+    [data-baseweb="tab"][aria-selected="true"] {color:ACTIVE_COLOR;}
+    .st-key-results_panel,.st-key-stack_panel {background:rgba(255,255,255,.82); padding:16px;}
+    .focus-card {background:rgba(255,255,255,.82); margin:12px 0;}
+    [data-testid="stSidebar"] {background:rgba(237,243,253,.9);}
+    @media(max-width:760px) {
+      [data-testid="stMainBlockContainer"] {padding:3rem 1rem 1rem;}
+      .hero h1 {font-size:1.5rem;}
+    }
     </style>
-    """.replace("BACKGROUND_VALUE", background), unsafe_allow_html=True)
+    """.replace("TITLE_COLOR", "#ffffff" if uri else "#142443")
+       .replace("SUBTITLE_COLOR", "#e4edff" if uri else "#526582")
+       .replace("ACTIVE_COLOR", "#93c5fd" if uri else "#2563eb")
+       .replace("BACKGROUND_VALUE", background), unsafe_allow_html=True)
 
 # --- State Initialization ---
 if "search_strings" not in st.session_state:
@@ -137,16 +167,13 @@ def clear_full_session():
 # --- UI Sidebar Layout ---
 with st.sidebar:
     st.header("Trace setup")
-    st.caption("Upload • Search • Inspect")
     uploaded_file = st.file_uploader("Upload trace file", type=["txt", "gz"])
     st.subheader("Keywords")
     st.text_input("Add keyword or pattern", key="keyword_input", on_change=add_keyword,
                   placeholder="e.g. dal.handle.field.error")
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        st.button("Add keyword", on_click=add_keyword, width="stretch")
-    with col_btn2:
-        st.button("Clear keywords", on_click=clear_keywords, width="stretch")
+    st.caption("Press Enter to add a keyword.")
+    if st.session_state.search_strings:
+        st.button("Clear keywords", on_click=clear_keywords)
     if st.session_state.search_strings:
         st.markdown("".join('<span class="badge">' + escape(k) + '</span>'
                             for k in st.session_state.search_strings), unsafe_allow_html=True)
@@ -296,13 +323,12 @@ with tab_main, st.container(key="results_panel"):
     else:
         st.info("Upload a trace dump log into the web browser and click run to trigger extraction.")
 
-with tab_stack, st.container(key="stack_panel"):
+with tab_stack:
     if st.session_state.selected_line and st.session_state.temp_file_path:
         selected_line = st.session_state.selected_line
         
         if "(depth" in selected_line:
-            st.subheader("Selected call")
-            st.code(selected_line, language=None, wrap_lines=True)
+
             
             session_match = re.search(r':::\(\d+\):', selected_line)
             session_id = session_match.group(0) if session_match else None
@@ -314,8 +340,12 @@ with tab_stack, st.container(key="stack_panel"):
                 target_depth = 0
 
             process_label = re.search(r"\d+", session_id).group(0) if session_id else "Unknown"
-            st.markdown(f'<span class="badge">Process {escape(process_label)}</span>'
-                        f'<span class="badge">Depth {target_depth}</span>', unsafe_allow_html=True)
+            function_match = re.search(r"\(depth\s+\d+\):\s*([^\(]+)", selected_line)
+            function_label = function_match.group(1).strip() if function_match else selected_line
+            st.markdown('<div class="focus-card"><strong>Selected call</strong><br>'
+                        f'<span class="badge">{escape(function_label)}</span>'
+                        f'<span class="badge">Process {escape(process_label)}</span>'
+                        f'<span class="badge">Depth {target_depth}</span></div>', unsafe_allow_html=True)
 
             if target_depth > 0:
                 stack_map = {}
@@ -354,18 +384,16 @@ with tab_stack, st.container(key="stack_panel"):
                     if stack_output:
                         stack_text = "\n\n".join(stack_output)
                     
-                        st.markdown("### Call stack")
-                        st.download_button("Download stack", stack_text, file_name="trace_stack.txt",
-                                           mime="text/plain", on_click="ignore")
-                        st.caption("Click the copy icon at the top-right to copy the entire stack.")
-                    
-                        st.code(
-                            stack_text,
-                            language=None,
-                            line_numbers=False,
-                            wrap_lines=False,
-                            height=480,
-                        )
+                        with st.container(key="stack_panel"):
+                            title_col, download_col = st.columns([3, 1])
+                            with title_col:
+                                st.subheader("Call stack")
+                            with download_col:
+                                st.download_button("Download stack", stack_text, file_name="trace_stack.txt",
+                                                   mime="text/plain", on_click="ignore")
+                            st.code(stack_text, language=None, line_numbers=False,
+                                    wrap_lines=False, height=400)
+                            st.caption("Use the copy icon at the top-right of the trace to copy the full stack.")
                     else:
                         st.info("No matching trace tree elements discovered leading up to this point.")
                 except Exception as e:
