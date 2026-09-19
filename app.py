@@ -125,6 +125,10 @@ def apply_appearance():
       [data-testid="stMainBlockContainer"] {padding:3rem 1rem 1rem;}
       .hero h1 {font-size:1.5rem;}
     }
+    .st-key-stack_panel [data-testid="stDownloadButton"] {
+    display: flex;
+    justify-content: flex-end;
+}
     </style>
     """.replace("HEADING_INK", "#ffffff" if uri else "#142443")
        .replace("SUBTITLE_COLOR", "#e4edff" if uri else "#526582")
