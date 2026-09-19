@@ -18,6 +18,17 @@ st.set_page_config(
     layout="wide"
 )
 
+st.slider(
+    "Panel transparency",
+    min_value=0,
+    max_value=90,
+    value=15,
+    step=5,
+    format="%d%%",
+    key="panel_transparency",
+    help="0% means solid panels. Higher values reveal more background.",
+)
+
 # Appearance is session-local; no external image service is used.
 def reset_appearance():
     st.session_state.default_theme = "System"
@@ -26,6 +37,7 @@ def reset_appearance():
     st.session_state.background_uri = ""
     st.session_state.background_hash = ""
     st.session_state.background_version = st.session_state.get("background_version", 0) + 1
+    st.session_state.panel_transparency = 15
 
 
 def prepare_background(upload):
@@ -163,7 +175,58 @@ def apply_appearance():
     elif theme == "System":
         st.markdown("<style>@media(prefers-color-scheme:dark){" + dark_css + "}</style>",
                     unsafe_allow_html=True)
+        transparency = st.session_state.get("panel_transparency", 15)
+    alpha = 1 - transparency / 100
 
+    panel_css = """
+    /* Adjust backgrounds only; keep text and buttons opaque. */
+    [data-testid="stSidebar"],
+    .status-strip,
+    .focus-card,
+    .st-key-results_panel,
+    .st-key-stack_panel,
+    .st-key-empty_panel {
+        background: rgba(PANEL_RGB, PANEL_ALPHA) !important;
+    }
+
+    /* Remove the solid background around the trace text. */
+    [data-testid="stCode"],
+    [data-testid="stCode"] > div,
+    [data-testid="stCode"] pre,
+    [data-testid="stCode"] code {
+        background: transparent !important;
+        background-color: transparent !important;
+    }
+    """
+
+    light_css = (
+        panel_css
+        .replace("PANEL_RGB", "255, 255, 255")
+        .replace("PANEL_ALPHA", str(alpha))
+    )
+
+    dark_panel_css = (
+        panel_css
+        .replace("PANEL_RGB", "20, 31, 50")
+        .replace("PANEL_ALPHA", str(alpha))
+    )
+
+    if theme == "Dark":
+        transparency_css = dark_panel_css
+    elif theme == "System":
+        transparency_css = (
+            light_css
+            + "@media (prefers-color-scheme: dark) {"
+            + dark_panel_css
+            + "}"
+        )
+    else:
+        transparency_css = light_css
+
+    st.markdown(
+        "<style>" + transparency_css + "</style>",
+        unsafe_allow_html=True,
+    )
 
 PRESETS = {
     "Mountain woods": "mountain-woods.jpg",
