@@ -9,6 +9,7 @@ import hashlib
 import io
 from html import escape
 from PIL import Image, ImageOps
+from pathlib import Path
 
 # --- Page Configuration & Theme Styling ---
 st.set_page_config(
@@ -19,6 +20,7 @@ st.set_page_config(
 
 # Appearance is session-local; no external image service is used.
 def reset_appearance():
+    st.session_state.default_theme = "System"
     st.session_state.background_mode = "Default"
     st.session_state.background_dim = 45
     st.session_state.background_uri = ""
@@ -42,8 +44,15 @@ def prepare_background(upload):
 
 
 def apply_appearance():
-    custom = st.session_state.get("background_mode") == "Custom"
-    uri = st.session_state.get("background_uri", "") if custom else ""
+    mode = st.session_state.get("background_mode", "Default")
+    uri = st.session_state.get("background_uri", "") if mode == "Custom" else ""
+    if mode == "Presets":
+        preset_file = PRESETS[st.session_state.get("nature_preset", "Mountain woods")]
+        path = Path(__file__).parent / "assets" / preset_file
+        if path.exists():
+            uri = "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+        else:
+            st.warning("Preset image missing. Upload the assets folder included in the ZIP.")
     dim = st.session_state.get("background_dim", 45) / 100
     background = (
         f'linear-gradient(rgba(9,20,42,{dim}),rgba(9,20,42,{dim})), url("{uri}")'
@@ -91,7 +100,7 @@ def apply_appearance():
     }
     [data-testid="stMainBlockContainer"] {padding:2.8rem 1.5rem 1.5rem; max-width:none;}
     [data-testid="stHeader"] {background:transparent; height:2.5rem;}
-    [data-testid="stSidebar"] {width:300px !important; min-width:300px !important;}
+    /* Let Streamlit control sidebar width, collapse, and mobile overlays. */
     [data-testid="stSidebarUserContent"] {padding:0 1.1rem 1rem;}
     [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:.42rem;}
     [data-testid="stSidebar"] h2 {padding:.2rem 0 .3rem;}
@@ -103,11 +112,11 @@ def apply_appearance():
     [data-testid="stSidebar"] [data-testid="stCheckbox"] {min-height:1.7rem;}
     [data-testid="stSidebar"] [data-testid="stCheckbox"] label:has(input:checked) span:first-child {background-color:#2563eb; border-color:#2563eb;}
     .hero {padding:0 0 10px; background:transparent; border:0; margin:0;}
-    .hero h1 {color:TITLE_COLOR; font-size:2rem;}
-    .hero p {color:SUBTITLE_COLOR;}
+    .hero h1 {color:HEADING_INK; font-size:2rem;}
+    .hero p {color:SUBTITLE_COLOR !important; text-shadow:0 1px 3px rgba(0,0,0,.25);}
     .status-strip {margin-bottom:4px; padding:12px 16px; background:rgba(255,255,255,.78);}
     [data-baseweb="tab-list"] {background:transparent; border-radius:0; padding:0; gap:28px;}
-    [data-baseweb="tab"] {color:TITLE_COLOR;}
+    [data-baseweb="tab"] {color:HEADING_INK;}
     [data-baseweb="tab"][aria-selected="true"] {color:ACTIVE_COLOR;}
     .st-key-results_panel,.st-key-stack_panel {background:rgba(255,255,255,.82); padding:16px;}
     .focus-card {background:rgba(255,255,255,.82); margin:12px 0;}
@@ -117,10 +126,50 @@ def apply_appearance():
       .hero h1 {font-size:1.5rem;}
     }
     </style>
-    """.replace("TITLE_COLOR", "#ffffff" if uri else "#142443")
+    """.replace("HEADING_INK", "#ffffff" if uri else "#142443")
        .replace("SUBTITLE_COLOR", "#e4edff" if uri else "#526582")
        .replace("ACTIVE_COLOR", "#93c5fd" if uri else "#2563eb")
        .replace("BACKGROUND_VALUE", background), unsafe_allow_html=True)
+    # CSS media query follows the viewer's device, not the server's theme.
+    theme = st.session_state.get("default_theme", "System") if mode == "Default" else "Light"
+    dark_css = """
+    .stApp {background:#0d1422 !important; color:#e5edf9; color-scheme:dark;}
+    [data-testid="stSidebar"] {background:#141f32 !important; border-color:#334155;}
+    [data-testid="stHeader"] {background:#0d1422;}
+    .hero h1,.hero p,[data-baseweb="tab"] {color:#e5edf9 !important;}
+    .status-strip,.focus-card,.st-key-results_panel,.st-key-stack_panel {
+        background:#18243a !important; color:#e5edf9; border-color:#334155;}
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stWidgetLabel"] p {color:#e5edf9;}
+    [data-testid="stCaptionContainer"] p {color:#b8c7df !important;}
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {color:#e5edf9;}
+    [data-testid="stExpander"] details {background:#141f32; border-color:#334155; color:#e5edf9;}
+    [data-testid="stFileUploaderDropzone"], [data-baseweb="input"],
+    [data-baseweb="base-input"], [data-baseweb="select"] > div {
+        background:#1e2d46 !important; color:#e5edf9 !important; border-color:#475569;}
+    input {color:#e5edf9 !important; -webkit-text-fill-color:#e5edf9;}
+    input::placeholder {color:#b8c7df !important;}
+    button[kind="secondary"],button[kind="tertiary"] {
+        background:#20304a; color:#e5edf9; border-color:#475569;}
+    .badge {background:#233e62; color:#c6ddff;}
+    [data-testid="stCode"], [data-testid="stCode"] pre {background:#101a2a !important;}
+    [data-testid="stCode"] code {color:#e5edf9 !important;}
+    [data-testid="stAlert"] {background:#20304a !important; color:#e5edf9;}
+    """
+    if theme == "Dark":
+        st.markdown("<style>" + dark_css + "</style>", unsafe_allow_html=True)
+    elif theme == "System":
+        st.markdown("<style>@media(prefers-color-scheme:dark){" + dark_css + "}</style>",
+                    unsafe_allow_html=True)
+
+
+PRESETS = {
+    "Mountain woods": "mountain-woods.jpg",
+    "Mount Fuji": "mount-fuji.jpg",
+    "Cloudy hills": "cloudy-hills.jpg",
+}
 
 # --- State Initialization ---
 if "search_strings" not in st.session_state:
@@ -186,7 +235,14 @@ with st.sidebar:
                                 disabled=uploaded_file is None)
     st.button("Clear session", on_click=clear_full_session, width="stretch")
     with st.expander("Appearance", expanded=True):
-        st.radio("Background", ["Default", "Custom"], horizontal=True, key="background_mode")
+        st.radio("Background", ["Default", "Presets", "Custom"], horizontal=True, key="background_mode")
+        if st.session_state.background_mode == "Default":
+            st.radio("Theme", ["System", "Light", "Dark"], horizontal=True, key="default_theme")
+        elif st.session_state.background_mode == "Presets":
+            preset = st.selectbox("Nature preset", list(PRESETS), key="nature_preset")
+            preview = Path(__file__).parent / "assets" / PRESETS[preset]
+            if preview.exists():
+                st.image(str(preview), caption=preset, width="stretch")
         if st.session_state.background_mode == "Custom":
             bg = st.file_uploader("Upload background image", type=["jpg", "jpeg", "png", "webp"],
                                  key=f"background_upload_{st.session_state.get('background_version', 0)}",
@@ -204,6 +260,7 @@ with st.sidebar:
             else:
                 st.session_state.background_uri = ""
                 st.session_state.background_hash = ""
+        if st.session_state.background_mode != "Default":
             st.slider("Dim background", 0, 85, 45, format="%d%%", key="background_dim")
         st.button("Reset appearance", on_click=reset_appearance, width="stretch")
         st.caption("Appearance applies to this session only.")
