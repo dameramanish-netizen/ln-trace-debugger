@@ -125,10 +125,6 @@ def apply_appearance():
       [data-testid="stMainBlockContainer"] {padding:3rem 1rem 1rem;}
       .hero h1 {font-size:1.5rem;}
     }
-    .st-key-stack_panel [data-testid="stDownloadButton"] {
-    display: flex;
-    justify-content: flex-end;
-}
     </style>
     """.replace("HEADING_INK", "#ffffff" if uri else "#142443")
        .replace("SUBTITLE_COLOR", "#e4edff" if uri else "#526582")
@@ -446,12 +442,13 @@ with tab_stack:
                         stack_text = "\n\n".join(stack_output)
                     
                         with st.container(key="stack_panel"):
-                            title_col, download_col = st.columns([3, 1])
+                            title_col, download_col = st.columns([3, 1], vertical_alignment="center")
                             with title_col:
                                 st.subheader("Call stack")
                             with download_col:
-                                st.download_button("Download stack", stack_text, file_name="trace_stack.txt",
-                                                   mime="text/plain", on_click="ignore")
+                                with st.container(horizontal=True, horizontal_alignment="right"):
+                                    st.download_button("Download stack", stack_text, file_name="trace_stack.txt",
+                                                       mime="text/plain", on_click="ignore")
                             st.code(stack_text, language=None, line_numbers=False,
                                     wrap_lines=False, height=400)
                             st.caption("Use the copy icon at the top-right of the trace to copy the full stack.")
