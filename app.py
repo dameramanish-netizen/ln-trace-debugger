@@ -18,16 +18,6 @@ st.set_page_config(
     layout="wide"
 )
 
-st.slider(
-    "Panel transparency",
-    min_value=0,
-    max_value=90,
-    value=15,
-    step=5,
-    format="%d%%",
-    key="panel_transparency",
-    help="0% means solid panels. Higher values reveal more background.",
-)
 
 # Appearance is session-local; no external image service is used.
 def reset_appearance():
@@ -176,7 +166,7 @@ def apply_appearance():
         st.markdown("<style>@media(prefers-color-scheme:dark){" + dark_css + "}</style>",
                     unsafe_allow_html=True)
         transparency = st.session_state.get("panel_transparency", 15)
-    alpha = 1 - transparency / 100
+    alpha = 1 - st.session_state.get("panel_transparency", 15) / 100
 
     panel_css = """
     /* Adjust backgrounds only; keep text and buttons opaque. */
@@ -325,6 +315,16 @@ with st.sidebar:
                 st.session_state.background_hash = ""
         if st.session_state.background_mode != "Default":
             st.slider("Dim background", 0, 85, 45, format="%d%%", key="background_dim")
+        st.slider(
+            "Panel transparency",
+            min_value=0,
+            max_value=90,
+            value=15,
+            step=5,
+            format="%d%%",
+            key="panel_transparency",
+            help="Higher values reveal more of the background.",
+        )
         st.button("Reset appearance", on_click=reset_appearance, width="stretch")
         st.caption("Appearance applies to this session only.")
 
