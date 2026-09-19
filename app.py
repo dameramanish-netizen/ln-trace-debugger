@@ -261,7 +261,18 @@ with tab_stack:
                         stack_output.append(line_text.strip())
                     
                     if stack_output:
-                        st.text_area("Reconstructed Trace Call Sequence Output", value="\n\n".join(stack_output), height=550)
+                        stack_text = "\n\n".join(stack_output)
+                    
+                        st.markdown("### Reconstructed Trace Call Sequence Output")
+                        st.caption("Click the copy icon at the top-right to copy the entire stack.")
+                    
+                        st.code(
+                            stack_text,
+                            language=None,
+                            line_numbers=False,
+                            wrap_lines=False,
+                            height=550,
+                        )
                     else:
                         st.info("No matching trace tree elements discovered leading up to this point.")
                 except Exception as e:
