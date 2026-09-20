@@ -246,9 +246,9 @@ def apply_appearance():
 
 # --- State Initialization ---
 if "background_mode" not in st.session_state:
-  st.session_state.background_mode = "Default"
+  st.session_state.background_mode = "Presets"
 if "nature_preset" not in st.session_state:
-  st.session_state.nature_preset = "Mountain woods"
+  st.session_state.nature_preset = "Mount Fuji"
 if "panel_transparency" not in st.session_state:
   st.session_state.panel_transparency = 75
 if "default_theme" not in st.session_state:
