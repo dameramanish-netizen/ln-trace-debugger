@@ -351,9 +351,6 @@ with st.sidebar:
       st.radio("Theme", ["System", "Light", "Dark"], horizontal=True, key="default_theme")
     elif st.session_state.background_mode == "Presets":
       preset = st.selectbox("Nature preset", list(PRESETS), key="nature_preset")
-      preview = Path(__file__).parent / "assets" / PRESETS[preset]
-      if preview.exists():
-        st.image(str(preview), caption=preset, use_container_width=True)
     if st.session_state.background_mode == "Custom":
       bg = st.file_uploader(
           "Upload background image",
