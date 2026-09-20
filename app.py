@@ -10,6 +10,7 @@ from PIL import Image, ImageOps
 import pandas as pd
 import streamlit as st
 import tempfile
+from time import perf_counter
 
 # --- Page Configuration & Theme Styling ---
 st.set_page_config(
@@ -245,7 +246,7 @@ def apply_appearance():
 
 # --- State Initialization ---
 if "background_mode" not in st.session_state:
-  st.session_state.background_mode = "Presets"
+  st.session_state.background_mode = "Default"
 if "nature_preset" not in st.session_state:
   st.session_state.nature_preset = "Mountain woods"
 if "panel_transparency" not in st.session_state:
@@ -390,7 +391,15 @@ with st.sidebar:
     st.button("Reset appearance", on_click=reset_appearance, use_container_width=True)
     st.caption("Appearance applies to this session only.")
 
+appearance_started = perf_counter()
+
 apply_appearance()
+
+print(
+    f"[Startup] apply_appearance: "
+    f"{perf_counter() - appearance_started:.3f} seconds",
+    flush=True,
+)
 st.markdown(
     '<div class="hero"><h1>Infor LN Trace Debugger</h1>'
     "<p>Search logs and inspect execution stacks</p></div>",
