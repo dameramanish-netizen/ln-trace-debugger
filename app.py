@@ -9,6 +9,7 @@ import re
 from PIL import Image, ImageOps
 import pandas as pd
 import streamlit as st
+import tempfile
 
 # --- Page Configuration & Theme Styling ---
 st.set_page_config(
