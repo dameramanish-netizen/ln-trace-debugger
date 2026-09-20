@@ -23,7 +23,6 @@ PRESETS = {
     "Cloudy hills": "cloudy-hills.jpg",
 }
 
-
 # Appearance is session-local; no external image service is used.
 def reset_appearance():
   st.session_state.default_theme = "System"
